@@ -20,7 +20,7 @@ with open('dengue_model.pkl', 'rb') as f:
     model = pickle.load(f)
 
 # আপনার OpenWeather API Key এখানে বসান
-OPENWEATHER_API_KEY = f99600fc4818c022f608cf96a4f348ba
+OPENWEATHER_API_KEY ="f99600fc4818c022f608cf96a4f348ba"
 
 @app.get("/")
 def home():
