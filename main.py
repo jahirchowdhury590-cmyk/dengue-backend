@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, Security
+from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 import requests
 import pickle
@@ -6,7 +7,7 @@ import numpy as np
 
 app = FastAPI()
 
-# Lovable ফ্রন্টএন্ড থেকে API কল করার জন্য CORS অন করা হলো
+# CORS Setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,20 +16,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ১. এআই মডেল লোড
+# API Key System Setup
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
+
+# Valid API Keys Dictionary
+VALID_API_KEYS = {
+    "aegis_my_lovable_frontend": "AegisDengue Public Dashboard", # আপনার ওয়েবসাইটের জন্য
+    "client_demo_key_001": "B2B Client Demo" # ভবিষ্যতে ক্লায়েন্টদের জন্য
+}
+
+def get_api_key(api_key: str = Security(api_key_header)):
+    if api_key in VALID_API_KEYS:
+        return api_key
+    raise HTTPException(status_code=403, detail="Access Denied: Invalid API Key")
+
+# Load ML Model
 with open('dengue_model.pkl', 'rb') as f:
     model = pickle.load(f)
 
-# আপনার OpenWeather API Key এখানে বসান
-OPENWEATHER_API_KEY ="f99600fc4818c022f608cf96a4f348ba"
+# OpenWeather API Key (আপনার আগের কি-টি)
+OPENWEATHER_API_KEY = "f99698fc4818c022f008cf96a4f340be"
 
 @app.get("/")
 def home():
-    return {"status": "Dengue Outbreak Prediction API is running!"}
+    return {"status": "AegisDengue API is running securely!"}
 
 @app.get("/predict")
-def predict(city: str = "Howrah"):
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
+def predict(city: str = "Howrah", api_key: str = Depends(get_api_key)):
+    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}"
     res = requests.get(url)
     
     if res.status_code == 200:
@@ -37,9 +53,8 @@ def predict(city: str = "Howrah"):
         humidity = data['main']['humidity']
         rain = data.get('rain', {}).get('1h', 0)
     else:
-        # কোনো কারণে এপিআই কাজ না করলে ডিফল্ট মান
-        temp, humidity, rain = 28.0, 80.0, 2.0
-
+        temp, humidity, rain = 30.0, 80.0, 2.0
+        
     features = np.array([[temp, humidity, rain]])
     predicted_cases = max(0, int(model.predict(features)[0]))
     
@@ -49,8 +64,9 @@ def predict(city: str = "Howrah"):
         risk = "Medium"
     else:
         risk = "Low"
-    
+        
     return {
+        "client_accessed": VALID_API_KEYS[api_key],
         "city": city,
         "temperature": temp,
         "humidity": humidity,
