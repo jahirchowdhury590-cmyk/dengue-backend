@@ -4,39 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 import requests
 import pickle
 import numpy as np
+import os  # <-- এটি নতুন যুক্ত হলো
 
 app = FastAPI()
 
-# CORS Setup
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# ... (CORS এবং API Key System-এর আগের কোডগুলো হুবহু থাকবে) ...
 
-# API Key System Setup
-API_KEY_NAME = "X-API-Key"
-api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
-
-# Valid API Keys Dictionary
-VALID_API_KEYS = {
-    "aegis_my_lovable_frontend": "AegisDengue Public Dashboard", # আপনার ওয়েবসাইটের জন্য
-    "client_demo_key_001": "B2B Client Demo" # ভবিষ্যতে ক্লায়েন্টদের জন্য
-}
-
-def get_api_key(api_key: str = Security(api_key_header)):
-    if api_key in VALID_API_KEYS:
-        return api_key
-    raise HTTPException(status_code=403, detail="Access Denied: Invalid API Key")
-
-# Load ML Model
-with open('dengue_model.pkl', 'rb') as f:
-    model = pickle.load(f)
-
-# OpenWeather API Key (আপনার আগের কি-টি)
-OPENWEATHER_API_KEY = "f99698fc4818c022f008cf96a4f340be"
+# এখানে সরাসরি Key না লিখে আমরা Environment Variable ব্যবহার করছি
+OPENWEATHER_API_KEY = os.environ.get("WEATHER_API_KEY")
 
 @app.get("/")
 def home():
@@ -44,7 +19,9 @@ def home():
 
 @app.get("/predict")
 def predict(city: str = "Howrah", api_key: str = Depends(get_api_key)):
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}"
+    
+    # URL-এর শেষে &units=metric যোগ করা হয়েছে যাতে তাপমাত্রা সেলসিয়াসে আসে
+    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
     res = requests.get(url)
     
     if res.status_code == 200:
@@ -53,6 +30,7 @@ def predict(city: str = "Howrah", api_key: str = Depends(get_api_key)):
         humidity = data['main']['humidity']
         rain = data.get('rain', {}).get('1h', 0)
     else:
+        # API সাময়িক কাজ না করলে এই ডামি ডেটাগুলো যাবে
         temp, humidity, rain = 30.0, 80.0, 2.0
         
     features = np.array([[temp, humidity, rain]])
