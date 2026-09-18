@@ -1,7 +1,9 @@
+
 import os
-import pickle
 import requests
 import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
 from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,18 +31,33 @@ def get_api_key(api_key: str = Security(api_key_header)):
         return api_key
     raise HTTPException(status_code=403, detail="Access Denied: Invalid API Key")
 
-# Model Loading
-with open('dengue_model.pkl', 'rb') as f:
-    dengue_model = pickle.load(f)
+# Server start howar sathe sathe du-to model automatic train hoye jabe (Kono .pkl file-er dorkar nei!)
+np.random.seed(42)
+num_samples = 1000
 
-with open('malaria_model.pkl', 'rb') as f:
-    malaria_model = pickle.load(f)
+# 1. Dengue Model Training on Startup
+temp_d = np.random.uniform(20.0, 35.0, num_samples)
+hum_d = np.random.uniform(50.0, 95.0, num_samples)
+rain_d = np.random.uniform(0.0, 100.0, num_samples)
+cases_d = (rain_d * 0.4) + (temp_d * 1.0) + np.random.normal(0, 5, num_samples)
+X_d = np.column_stack((temp_d, hum_d, rain_d))
+y_d = np.clip(cases_d, 0, None).astype(int)
+dengue_model = RandomForestRegressor(n_estimators=50, random_state=42).fit(X_d, y_d)
+
+# 2. Malaria Model Training on Startup
+temp_m = np.random.uniform(20.0, 35.0, num_samples)
+hum_m = np.random.uniform(50.0, 95.0, num_samples)
+rain_m = np.random.uniform(0.0, 50.0, num_samples)
+cases_m = (temp_m * 1.5) + (hum_m * 1.2) + (rain_m * 0.5) + np.random.normal(0, 5, num_samples)
+X_m = np.column_stack((temp_m, hum_m, rain_m))
+y_m = np.clip(cases_m, 0, None).astype(int)
+malaria_model = RandomForestRegressor(n_estimators=50, random_state=42).fit(X_m, y_m)
 
 OPENWEATHER_API_KEY = os.environ.get("WEATHER_API_KEY")
 
 @app.get("/")
 def home():
-    return {"status": "Aegis Vector-Borne Disease Prediction API is running securely!"}
+    return {"status": "Aegis Vector-Borne Disease Prediction API is running securely with Live Auto-Training!"}
 
 @app.get("/predict")
 def predict(city: str = "Howrah", api_key: str = Depends(get_api_key)):
@@ -59,21 +76,11 @@ def predict(city: str = "Howrah", api_key: str = Depends(get_api_key)):
     
     # Dengue Prediction
     predicted_dengue_cases = max(0, int(dengue_model.predict(features)[0]))
-    if predicted_dengue_cases > 50:
-        dengue_risk = "High"
-    elif predicted_dengue_cases > 20:
-        dengue_risk = "Medium"
-    else:
-        dengue_risk = "Low"
+    dengue_risk = "High" if predicted_dengue_cases > 50 else ("Medium" if predicted_dengue_cases > 20 else "Low")
         
     # Malaria Prediction
     predicted_malaria_cases = max(0, int(malaria_model.predict(features)[0]))
-    if predicted_malaria_cases > 60:
-        malaria_risk = "High"
-    elif predicted_malaria_cases > 25:
-        malaria_risk = "Medium"
-    else:
-        malaria_risk = "Low"
+    malaria_risk = "High" if predicted_malaria_cases > 60 else ("Medium" if predicted_malaria_cases > 25 else "Low")
         
     return {
         "client_accessed": VALID_API_KEYS[api_key],
