@@ -101,8 +101,10 @@ def predict(city: str = "Howrah", api_key: str = Depends(get_api_key)):
     predicted_malaria = max(10, int(malaria_rf.predict(features)[0]))
 
     # --- Risk Levels ---
-    dengue_risk = "High" if predicted_dengue >= 85 else ("Medium" if predicted_dengue >= 40 else "Low")
-    malaria_risk = "High" if predicted_malaria >= 80 else ("Medium" if predicted_malaria >= 38 else "Low")
+        # --- NBA Standard Risk Thresholds (Strict & Logical) ---
+    dengue_risk = "High" if predicted_dengue >= 130 else ("Medium" if predicted_dengue >= 55 else "Low")
+    malaria_risk = "High" if predicted_malaria >= 130 else ("Medium" if predicted_malaria >= 50 else "Low")
+
         
     return {
         "client_accessed": VALID_API_KEYS[api_key],
